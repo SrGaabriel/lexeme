@@ -1,5 +1,8 @@
 [package]
 name = "lexeme"
+description = "A command line tool for searching through dictionaries"
+license-file = "LICENSE"
+repository = "https://github.com/SrGaabriel/lexeme"
 version = "0.0.1"
 edition = "2024"
 
