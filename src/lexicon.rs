@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::{self, BufRead, Write};
 
 pub const MAGIC: &str = "#lexeme-lexicon";
 pub const VERSION: u32 = 1;
@@ -95,7 +95,7 @@ impl<'a> Entry<'a> {
 }
 
 pub fn parse_entry(line: &str) -> Option<Entry<'_>> {
-    if line.is_empty() || line.starts_with('#') {
+    if line.is_empty() {
         return None;
     }
     let mut cols = line.split('\t');
@@ -114,6 +114,99 @@ pub fn parse_entry(line: &str) -> Option<Entry<'_>> {
         ipa,
         forms,
     })
+}
+
+pub struct Reader<R> {
+    inner: R,
+    meta: Meta,
+    line: String,
+    pending: bool,
+    line_number: u64,
+}
+
+impl<R: BufRead> Reader<R> {
+    pub fn new(mut inner: R) -> io::Result<Self> {
+        let mut meta = Meta::default();
+        let mut line = String::new();
+        let mut line_number = 0u64;
+        let mut version = None;
+        let mut pending = false;
+
+        while inner.fill_buf()?.first() == Some(&b'#') {
+            line.clear();
+            if inner.read_line(&mut line)? == 0 {
+                break;
+            }
+            line_number += 1;
+            let trimmed = line.trim_end_matches(['\r', '\n']);
+            if let Some(rest) = trimmed.strip_prefix(MAGIC) {
+                version = Some(parse_version(rest)?);
+            } else if is_header_line(trimmed) {
+                meta.apply_line(trimmed);
+            } else {
+                pending = true;
+                break;
+            }
+        }
+
+        let version =
+            version.ok_or_else(|| io::Error::other("not a lexicon: missing magic header"))?;
+        if version != VERSION {
+            return Err(io::Error::other(format!(
+                "lexicon is v{version}, this build reads v{VERSION}"
+            )));
+        }
+
+        Ok(Self {
+            inner,
+            meta,
+            line,
+            pending,
+            line_number,
+        })
+    }
+
+    pub fn meta(&self) -> &Meta {
+        &self.meta
+    }
+
+    pub fn line_number(&self) -> u64 {
+        self.line_number
+    }
+
+    pub fn next_entry(&mut self) -> io::Result<Option<Entry<'_>>> {
+        let len = if std::mem::take(&mut self.pending) {
+            self.line.trim_end_matches(['\r', '\n']).len()
+        } else {
+            loop {
+                self.line.clear();
+                if self.inner.read_line(&mut self.line)? == 0 {
+                    return Ok(None);
+                }
+                self.line_number += 1;
+                let len = self.line.trim_end_matches(['\r', '\n']).len();
+                if len > 0 {
+                    break len;
+                }
+            }
+        };
+
+        let line_number = self.line_number;
+        parse_entry(&self.line[..len])
+            .map(Some)
+            .ok_or_else(move || io::Error::other(format!("malformed entry on line {line_number}")))
+    }
+}
+
+fn is_header_line(line: &str) -> bool {
+    line.bytes().filter(|b| *b == b'\t').count() == 1
+}
+
+fn parse_version(rest: &str) -> io::Result<u32> {
+    rest.trim()
+        .strip_prefix('v')
+        .and_then(|digits| digits.parse().ok())
+        .ok_or_else(|| io::Error::other(format!("unrecognized lexicon magic: {MAGIC}{rest}")))
 }
 
 pub fn write_entry<W: Write>(

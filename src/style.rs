@@ -216,6 +216,40 @@ pub fn spinner(message: impl Into<Cow<'static, str>>) -> ProgressBar {
     bar
 }
 
+pub fn progress_bar(total: Option<u64>, message: impl Into<Cow<'static, str>>) -> ProgressBar {
+    if is_quiet() || !std::io::stderr().is_terminal() {
+        return ProgressBar::hidden();
+    }
+    let color = color_enabled();
+    let bar = match total {
+        Some(total) => {
+            let template = if color {
+                "{msg} {bar:28.cyan/blue} {bytes}/{total_bytes} {bytes_per_sec} eta {eta}"
+            } else {
+                "{msg} {bar:28} {bytes}/{total_bytes} {bytes_per_sec} eta {eta}"
+            };
+            let style = ProgressStyle::with_template(template)
+                .expect("progress template is valid")
+                .progress_chars("━╸─");
+            ProgressBar::new(total).with_style(style)
+        }
+        None => {
+            let template = if color {
+                "{spinner:.cyan.bold} {msg} {bytes} {bytes_per_sec}"
+            } else {
+                "{spinner} {msg} {bytes} {bytes_per_sec}"
+            };
+            let style = ProgressStyle::with_template(template)
+                .expect("progress template is valid")
+                .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ");
+            ProgressBar::new_spinner().with_style(style)
+        }
+    };
+    bar.set_message(message);
+    bar.enable_steady_tick(Duration::from_millis(80));
+    bar
+}
+
 pub struct Hyperlink<'a> {
     url: String,
     text: &'a str,

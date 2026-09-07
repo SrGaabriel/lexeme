@@ -1,17 +1,50 @@
-use clap::Parser;
-use lexeme::util::Range;
+use clap::{Args, Parser};
+use lexeme::{dict, style, util::Range};
 
 #[derive(Debug, Parser)]
+#[clap(name = "lexeme", version, about, long_about = None)]
 pub struct Cli {
-    #[clap(short, long, default_value = "en")]
-    pub language: String,
+    #[command(flatten)]
+    pub query: Query,
+    #[clap(subcommand)]
+    pub command: Option<Command>,
+}
+
+#[derive(Args, Debug)]
+pub struct Query {
+    #[clap(short, long)]
+    pub languages: Vec<String>,
     #[clap(short, long)]
     pub regex: Option<String>,
     #[clap(short, long)]
     pub syllables: Option<Range<u32>>,
 }
 
-fn main() {
+#[derive(Debug, Parser)]
+pub enum Command {
+    Install { language: String },
+}
+
+fn main() -> lexeme::Result<()> {
     let args = Cli::parse();
-    println!("args: {:?}", args);
+    let result = match args.command {
+        Some(Command::Install { language }) => dict::install(language),
+        None => {
+            
+            Ok(())
+        }
+    };
+
+    if let Err(err) = &result {
+        style::error(err);
+    }
+    result
+}
+
+pub struct Engine {
+    languages 
+}
+
+impl Engine {
+    
 }
