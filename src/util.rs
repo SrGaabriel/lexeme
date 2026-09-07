@@ -68,6 +68,7 @@ impl RangeBounds<u8> for LenRange {
     fn start_bound(&self) -> Bound<&u8> {
         Bound::Included(&self.lo)
     }
+
     fn end_bound(&self) -> Bound<&u8> {
         if self.is_empty() {
             Bound::Excluded(&self.lo)

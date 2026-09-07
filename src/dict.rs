@@ -1,12 +1,11 @@
-use std::{fs::File, io::BufReader, path::PathBuf};
+use std::{
+    fs::File,
+    io::{BufReader, Read},
+    path::PathBuf,
+};
 use zstd::Decoder;
 
-use crate::{
-    Error, Result,
-    fs::languages_dir,
-    lexicon,
-    style::{self},
-};
+use crate::{Error, Result, fs::languages_dir, lexicon};
 
 pub const REPO_URL: &str = "https://github.com/SrGaabriel/lexeme_dictionaries";
 
@@ -24,34 +23,42 @@ pub fn compressed_path(language: &str) -> Result<PathBuf> {
     Ok(dir.join(format!("{language}.lex.zst")))
 }
 
-pub fn install(language: String) -> Result<()> {
-    let url = language_url(&language);
-
-    let connecting = style::spinner(format!("resolving {language}"));
+pub fn resolve(language: &str) -> Result<reqwest::blocking::Response> {
+    let url = language_url(language);
     let response = reqwest::blocking::get(&url)?;
-    connecting.finish_and_clear();
-
     if !response.status().is_success() {
         return Err(Error::DownloadError(response.status().to_string()));
     }
 
-    let dir = languages_dir()?;
+    Ok(response)
+}
 
-    let compressed_path = compressed_path(&language)?;
+pub fn download<T: Read>(language: &str, reader: &mut T) -> Result<()> {
+    let dir = languages_dir()?;
+    let compressed_path = compressed_path(language)?;
+    if compressed_path.exists() {
+        return Err(Error::LanguageAlreadyInstalled(language.to_string()));
+    }
+
     let compressed_partial_path = dir.join(format!("{language}.lex.zst.part"));
 
-    let total = response.content_length();
-    let download_bar = style::progress_bar(total, format!("downloading {language}"));
-    let mut reader = download_bar.wrap_read(response);
     let mut compressed_file = File::create(&compressed_partial_path)?;
 
-    std::io::copy(&mut reader, &mut compressed_file)?;
+    std::io::copy(reader, &mut compressed_file)?;
     compressed_file.sync_all()?;
     drop(compressed_file);
-
-    download_bar.finish_and_clear();
     std::fs::rename(&compressed_partial_path, &compressed_path)?;
 
+    Ok(())
+}
+
+pub fn remove(language: &str) -> Result<()> {
+    let compressed_path = compressed_path(language)?;
+    if !compressed_path.exists() {
+        return Err(Error::LanguageNotInstalled(language.to_string()));
+    }
+
+    std::fs::remove_file(compressed_path)?;
     Ok(())
 }
 

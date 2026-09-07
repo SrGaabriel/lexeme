@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use std::time::Duration;
 
 use indicatif::{ProgressBar, ProgressStyle};
+use mago_pager::Pager;
 use owo_colors::OwoColorize;
 pub use owo_colors::Style;
 
@@ -286,4 +287,13 @@ pub fn plural(n: usize, word: &str) -> String {
     } else {
         format!("{n} {word}s")
     }
+}
+
+pub fn new_pager() -> Option<mago_pager::PagerSession> {
+    let pager_env = if std::env::var_os("LESS").is_none() {
+        vec![("LESS", "FRX")]
+    } else {
+        Vec::new()
+    };
+    Pager::new().envs(pager_env).spawn().ok()
 }

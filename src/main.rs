@@ -3,7 +3,7 @@ use std::io::{BufWriter, Write};
 use clap::{Args, Parser};
 use lexeme::{
     dict::{self, installed_languages},
-    style::{self, Tone, plural},
+    style::{self, Tone, new_pager, plural},
     util::LenRange,
 };
 use regex::Regex;
@@ -15,6 +15,8 @@ pub struct Cli {
     pub query: Query,
     #[clap(subcommand)]
     pub command: Option<Command>,
+    #[arg(long, global = true, default_value = "false")]
+    no_pager: bool,
 }
 
 #[derive(Args, Debug)]
@@ -32,23 +34,32 @@ pub struct Query {
 
 #[derive(Debug, Parser)]
 pub enum Command {
-    Install { language: String },
+    #[clap(subcommand)]
+    Lang(Languages),
 }
 
-fn main() -> lexeme::Result<()> {
+#[derive(Debug, Parser)]
+pub enum Languages {
+    Add { language: String },
+    List,
+    Remove { language: String },
+}
+
+fn main() {
     let args = Cli::parse();
     let result = match args.command {
-        Some(Command::Install { language }) => dict::install(language),
-        None => run(args.query),
+        Some(Command::Lang(Languages::Add { language })) => add_language(&language),
+        Some(Command::Lang(Languages::List)) => list_languages(!args.no_pager),
+        Some(Command::Lang(Languages::Remove { language })) => remove_language(&language),
+        None => run(args.query, !args.no_pager),
     };
 
     if let Err(err) = &result {
         style::error(err);
     }
-    result
 }
 
-pub fn run(query: Query) -> lexeme::Result<()> {
+pub fn run(query: Query, pager: bool) -> lexeme::Result<()> {
     let languages = match query.languages {
         Some(languages) => languages,
         None => installed_languages()?,
@@ -61,6 +72,7 @@ pub fn run(query: Query) -> lexeme::Result<()> {
     let mut words_total = 0u64;
     let mut last = String::new();
 
+    let pager = new_pager().filter(|_| pager);
     for language in &languages {
         let mut reader = dict::read(language)?;
         words_total += reader.meta().entries;
@@ -95,6 +107,7 @@ pub fn run(query: Query) -> lexeme::Result<()> {
         }
     }
     out.flush()?;
+    drop(pager);
     drop(out);
 
     println!();
@@ -108,5 +121,38 @@ pub fn run(query: Query) -> lexeme::Result<()> {
             plural(words_total as usize, "word")
         ),
     );
+    Ok(())
+}
+
+pub fn add_language(language: &str) -> lexeme::Result<()> {
+    let connecting = style::spinner(format!("resolving {language}"));
+    let response = dict::resolve(language)?;
+    connecting.finish_and_clear();
+
+    let total = response.content_length();
+    let download_bar = style::progress_bar(total, format!("downloading {language}"));
+    let mut reader = download_bar.wrap_read(response);
+
+    dict::download(language, &mut reader)?;
+
+    download_bar.finish_and_clear();
+    Ok(())
+}
+
+fn list_languages(pager: bool) -> lexeme::Result<()> {
+    style::status(Tone::Accent, "list", "installed languages:");
+    let pager = new_pager().filter(|_| pager);
+    let languages = dict::installed_languages()?;
+    println!();
+    for language in languages {
+        println!("• {}", language);
+    }
+    drop(pager);
+    Ok(())
+}
+
+pub fn remove_language(language: &str) -> lexeme::Result<()> {
+    dict::remove(language)?;
+    style::success(format!("removed {language} language"));
     Ok(())
 }
