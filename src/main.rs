@@ -71,9 +71,15 @@ pub fn run(query: Query) -> lexeme::Result<()> {
             {
                 continue;
             }
-            if query.words_only && !word.chars().all(char::is_alphanumeric) {
+            if query.words_only && word.chars().any(|c| !c.is_alphanumeric()) {
                 continue;
             }
+            if let Some(syllables) = query.syllables
+                && (entry.syllables == 0 || !syllables.contains(entry.syllables))
+            {
+                continue;
+            }
+
             if let Some(regex) = &regex
                 && !regex.is_match(word)
             {
