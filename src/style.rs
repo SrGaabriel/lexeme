@@ -165,8 +165,8 @@ pub fn format_status_with_meta(
     meta: impl Display,
 ) -> String {
     match tone {
-        Tone::Error => styled(format!("{verb} {subject} {meta}"), Style::new().red()),
-        _ => format!("{} {} {}", paint(verb, tone), dim(subject), dim(meta)),
+        Tone::Error => styled(format!("{verb} {subject} • {meta}"), Style::new().red()),
+        _ => format!("{} {} • {}", paint(verb, tone), dim(subject), dim(meta)),
     }
 }
 
@@ -278,4 +278,12 @@ impl Display for Hyperlink<'_> {
 
 fn path_str(path: &std::path::Path) -> &str {
     path.to_str().unwrap_or("<non-utf8 path>")
+}
+
+pub fn plural(n: usize, word: &str) -> String {
+    if n == 1 {
+        format!("{n} {word}")
+    } else {
+        format!("{n} {word}s")
+    }
 }

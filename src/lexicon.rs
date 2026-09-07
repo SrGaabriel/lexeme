@@ -1,5 +1,7 @@
 use std::io::{self, BufRead, Write};
 
+use crate::{Error, Result};
+
 pub const MAGIC: &str = "#lexeme-lexicon";
 pub const VERSION: u32 = 1;
 
@@ -66,7 +68,7 @@ impl<'a> Form<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Entry<'a> {
     pub word: &'a str,
     pub pos: &'a str,
@@ -125,7 +127,7 @@ pub struct Reader<R> {
 }
 
 impl<R: BufRead> Reader<R> {
-    pub fn new(mut inner: R) -> io::Result<Self> {
+    pub fn new(mut inner: R) -> Result<Self> {
         let mut meta = Meta::default();
         let mut line = String::new();
         let mut line_number = 0u64;
@@ -152,9 +154,7 @@ impl<R: BufRead> Reader<R> {
         let version =
             version.ok_or_else(|| io::Error::other("not a lexicon: missing magic header"))?;
         if version != VERSION {
-            return Err(io::Error::other(format!(
-                "lexicon is v{version}, this build reads v{VERSION}"
-            )));
+            return Err(Error::LexiconVersionMismatch(VERSION, version));
         }
 
         Ok(Self {

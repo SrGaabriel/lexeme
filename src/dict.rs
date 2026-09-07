@@ -1,12 +1,11 @@
-use std::fs::File;
-
-use indicatif::HumanBytes;
+use std::{fs::File, io::BufReader, path::PathBuf};
 use zstd::Decoder;
 
 use crate::{
     Error, Result,
     fs::languages_dir,
-    style::{self, Tone},
+    lexicon,
+    style::{self},
 };
 
 pub const REPO_URL: &str = "https://github.com/SrGaabriel/lexeme_dictionaries";
@@ -18,6 +17,11 @@ pub fn asset_url(asset_name: &str) -> String {
 pub fn language_url(language: &str) -> String {
     let asset_name = format!("{language}.lex.zst");
     asset_url(&asset_name)
+}
+
+pub fn compressed_path(language: &str) -> Result<PathBuf> {
+    let dir = languages_dir()?;
+    Ok(dir.join(format!("{language}.lex.zst")))
 }
 
 pub fn install(language: String) -> Result<()> {
@@ -33,7 +37,7 @@ pub fn install(language: String) -> Result<()> {
 
     let dir = languages_dir()?;
 
-    let compressed_path = dir.join(format!("{language}.lex.zst"));
+    let compressed_path = compressed_path(&language)?;
     let compressed_partial_path = dir.join(format!("{language}.lex.zst.part"));
 
     let total = response.content_length();
@@ -48,24 +52,33 @@ pub fn install(language: String) -> Result<()> {
     download_bar.finish_and_clear();
     std::fs::rename(&compressed_partial_path, &compressed_path)?;
 
-    let output_path = dir.join(format!("{language}.lex"));
-    let output_partial_path = dir.join(format!("{language}.lex.part"));
-
-    let unzip_bar = style::progress_bar(total, format!("unzipping {language}"));
-    let mut decoder = Decoder::new(File::open(&compressed_path)?)?;
-    let mut decompressed_file = File::create(&output_partial_path)?;
-    let mut writer = unzip_bar.wrap_write(&mut decompressed_file);
-
-    let written = std::io::copy(&mut decoder, &mut writer)?;
-
-    drop(writer);
-    decompressed_file.sync_all()?;
-    drop(decompressed_file);
-
-    unzip_bar.finish_and_clear();
-    std::fs::rename(&output_partial_path, &output_path)?;
-    std::fs::remove_file(&compressed_path)?;
-    style::status_meta(Tone::Success, "installed", &language, HumanBytes(written));
-
     Ok(())
+}
+
+pub fn read(language: &str) -> Result<lexicon::Reader<BufReader<Decoder<'_, BufReader<File>>>>> {
+    let compressed_path = compressed_path(language)?;
+    if !compressed_path.exists() {
+        return Err(Error::LanguageNotInstalled(language.to_string()));
+    }
+
+    let decoder = Decoder::new(File::open(&compressed_path)?)?;
+    let source = BufReader::new(decoder);
+    lexicon::Reader::new(source)
+}
+
+pub fn installed_languages() -> Result<Vec<String>> {
+    let dir = languages_dir()?;
+    let read_dir = std::fs::read_dir(dir)?;
+    let mut langs = vec![];
+    for read in read_dir {
+        let file = read?;
+        let Ok(file_name) = file.file_name().into_string() else {
+            continue;
+        };
+        let Some(lang) = file_name.strip_suffix(".lex.zst") else {
+            continue;
+        };
+        langs.push(lang.to_string());
+    }
+    Ok(langs)
 }
