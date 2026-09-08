@@ -1,9 +1,9 @@
 [package]
 name = "lexeme"
-description = "A command line tool for searching through dictionaries"
+description = "Command-line tool for searching through dictionaries"
 license-file = "LICENSE"
 repository = "https://github.com/SrGaabriel/lexeme"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 exclude = [".github/"]
 
@@ -13,7 +13,7 @@ thiserror = "2"
 indicatif = "0.18"
 owo-colors = "4.4"
 supports-hyperlinks = "3.2.0"
-zstd = "0.13"
+zstd = "0.14"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dirs = "7.0.0"

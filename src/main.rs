@@ -1,48 +1,81 @@
 use std::io::{BufWriter, Write};
 
-use clap::{Args, Parser};
+use clap::{ArgAction, Args, Parser, Subcommand};
 use lexeme::{
+    Error,
     dict::{self, installed_languages},
     style::{self, Tone, new_pager, plural},
     util::LenRange,
 };
 use regex::Regex;
 
+const EXAMPLES: &str = "\
+Examples:
+  lexeme '^un.*ing$'             words beginning \"un\" and ending \"ing\"
+  lexeme -l en,de '^haus'        search only English and German
+  lexeme -s 3 '^pro'             three-syllable words beginning \"pro\"
+  lexeme --length 5..=7 '^z'     words of 5 to 7 characters
+  lexeme -w false '\\p{Emoji}'   include symbol and emoji entries
+
+  lexeme lang add fi            install the Finnish dictionary
+  lexeme lang list              show what is installed";
+
 #[derive(Debug, Parser)]
-#[clap(name = "lexeme", version, about, long_about = None)]
+#[command(name = "lexeme", version, after_help = EXAMPLES)]
 pub struct Cli {
     #[command(flatten)]
     pub query: Query,
-    #[clap(subcommand)]
+
+    #[command(subcommand)]
     pub command: Option<Command>,
-    #[arg(long, global = true, default_value = "false")]
+
+    #[arg(long, global = true)]
     no_pager: bool,
 }
 
 #[derive(Args, Debug)]
 pub struct Query {
-    pub regex: Option<String>,
-    #[clap(short, long)]
+    #[arg(value_name = "REGEX")]
+    pub regex: String,
+
+    #[arg(short, long, value_name = "CODE", value_delimiter = ',')]
     pub languages: Option<Vec<String>>,
-    #[clap(short, long)]
+
+    #[arg(short, long, value_name = "RANGE", verbatim_doc_comment)]
     pub syllables: Option<LenRange>,
-    #[clap(long)]
+
+    #[arg(long, value_name = "RANGE", verbatim_doc_comment)]
     pub length: Option<LenRange>,
-    #[clap(short, long, default_value = "true")]
+
+    #[arg(
+        short,
+        long,
+        value_name = "BOOL",
+        default_value_t = true,
+        action = ArgAction::Set,
+        num_args = 0..=1,
+        default_missing_value = "true",
+    )]
     pub words_only: bool,
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Subcommand)]
 pub enum Command {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     Lang(Languages),
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Subcommand)]
 pub enum Languages {
-    Add { language: String },
+    Add {
+        #[arg(value_name = "CODE")]
+        language: String,
+    },
     List,
-    Remove { language: String },
+    Remove {
+        #[arg(value_name = "CODE")]
+        language: String,
+    },
 }
 
 fn main() {
@@ -64,7 +97,10 @@ pub fn run(query: Query, pager: bool) -> lexeme::Result<()> {
         Some(languages) => languages,
         None => installed_languages()?,
     };
-    let regex = query.regex.as_deref().map(Regex::new).transpose()?;
+    if languages.is_empty() {
+        return Err(Error::NoLanguagesInstalled);
+    }
+    let regex = Regex::new(&query.regex)?;
 
     let stdout = std::io::stdout();
     let mut out = BufWriter::new(stdout.lock());
@@ -92,9 +128,7 @@ pub fn run(query: Query, pager: bool) -> lexeme::Result<()> {
                 continue;
             }
 
-            if let Some(regex) = &regex
-                && !regex.is_match(word)
-            {
+            if !regex.is_match(word) {
                 continue;
             }
             if word == last {

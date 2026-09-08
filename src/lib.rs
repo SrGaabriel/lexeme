@@ -13,7 +13,7 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("json error: {0}")]
     Reqwest(#[from] reqwest::Error),
-    #[error("failed to download language file for {0}")]
+    #[error("failed to download language file with status {0}")]
     DownloadError(String),
     #[error("could not determine home directory, set LEXEME_DIR environment variable to override")]
     HomeDirError,
@@ -23,6 +23,8 @@ pub enum Error {
     LanguageNotInstalled(String),
     #[error("language `{0}` already installed")]
     LanguageAlreadyInstalled(String),
+    #[error("no languages installed. install one with `lexeme lang add`")]
+    NoLanguagesInstalled,
     #[error("invalid regex string error")]
     Regex(#[from] regex::Error)
 }
