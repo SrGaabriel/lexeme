@@ -21,10 +21,12 @@ Examples:
   lexeme lang list              show what is installed";
 
 #[derive(Debug, Parser)]
-#[command(name = "lexeme", version, after_help = EXAMPLES)]
+#[command(
+    name = "lexeme", version, after_help = EXAMPLES, subcommand_negates_reqs = true
+)]
 pub struct Cli {
     #[command(flatten)]
-    pub query: Query,
+    pub query: Option<Query>,
 
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -84,7 +86,10 @@ fn main() {
         Some(Command::Lang(Languages::Add { language })) => add_language(&language),
         Some(Command::Lang(Languages::List)) => list_languages(!args.no_pager),
         Some(Command::Lang(Languages::Remove { language })) => remove_language(&language),
-        None => run(args.query, !args.no_pager),
+        None => run(
+            args.query.unwrap(),
+            !args.no_pager,
+        ),
     };
 
     if let Err(err) = &result {
