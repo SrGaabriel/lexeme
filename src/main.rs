@@ -179,7 +179,7 @@ fn list_languages(pager: bool) -> lexeme::Result<()> {
     let languages = dict::installed_languages()?;
     println!();
     for language in languages {
-        println!("• {}", language);
+        println!("• {language}");
     }
     drop(pager);
     Ok(())

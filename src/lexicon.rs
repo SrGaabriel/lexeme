@@ -40,11 +40,11 @@ impl Meta {
             return;
         };
         match key {
-            "lang" => self.lang = value.to_owned(),
-            "name" => self.name = value.to_owned(),
-            "source" => self.source = value.to_owned(),
-            "generated" => self.generated = value.to_owned(),
-            "license" => self.license = value.to_owned(),
+            "lang" => value.clone_into(&mut self.lang),
+            "name" => value.clone_into(&mut self.name),
+            "source" => value.clone_into(&mut self.source),
+            "generated" => value.clone_into(&mut self.generated),
+            "license" => value.clone_into(&mut self.license),
             "entries" => self.entries = value.parse().unwrap_or(0),
             "forms" => self.forms = value.parse().unwrap_or(0),
             _ => {}

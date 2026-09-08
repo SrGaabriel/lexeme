@@ -26,7 +26,7 @@ pub enum Error {
     #[error("no languages installed. install one with `lexeme lang add`")]
     NoLanguagesInstalled,
     #[error("invalid regex string error")]
-    Regex(#[from] regex::Error)
+    Regex(#[from] regex::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

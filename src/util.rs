@@ -19,12 +19,12 @@ impl LenRange {
         Self { lo, hi }
     }
 
-    #[inline(always)]
+    #[inline]
     pub const fn contains(self, x: u8) -> bool {
         self.lo <= x && x <= self.hi
     }
 
-    #[inline(always)]
+    #[inline]
     pub const fn contains_len(self, len: usize) -> bool {
         let x = if len > u8::MAX as usize {
             u8::MAX
@@ -70,7 +70,7 @@ impl RangeBounds<u8> for LenRange {
     }
 
     fn end_bound(&self) -> Bound<&u8> {
-        if self.is_empty() {
+        if LenRange::is_empty(*self) {
             Bound::Excluded(&self.lo)
         } else {
             Bound::Included(&self.hi)
@@ -136,7 +136,7 @@ impl FromStr for LenRange {
 
 impl fmt::Display for LenRange {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_empty() {
+        if LenRange::is_empty(*self) {
             return write!(f, "{}..{}", self.lo, self.lo);
         }
         if self.lo != 0 {
