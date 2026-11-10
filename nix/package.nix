@@ -4,6 +4,7 @@
   cmake,
   pkg-config,
   zstd,
+  aws-lc,
 }:
 let
   cargoToml = lib.importTOML ../Cargo.toml;
@@ -28,7 +29,10 @@ rustPlatform.buildRustPackage {
     cmake
     pkg-config
   ];
-  buildInputs = [ zstd ];
+  buildInputs = [
+    zstd
+    aws-lc
+  ];
 
   meta = {
     inherit (cargoToml.package) description;
